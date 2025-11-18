@@ -600,9 +600,11 @@
 
             sendMQTT('spital/logistik/befuellung', data);
 
-            // Formular ausblenden, Erfolgsmeldung mit OK-Button anzeigen
+            // Alles ausblenden, nur Erfolgsmeldung mit OK-Button anzeigen
             document.getElementById('befuellungForm').classList.add('hidden');
             document.getElementById('scanResult1').classList.add('hidden');
+            document.querySelector('#befuellungScreen .step-indicator').classList.add('hidden');
+            document.querySelector('#befuellungScreen .btn-secondary').classList.add('hidden');
             document.getElementById('befuellungMessage').classList.remove('hidden');
         }
 
@@ -663,9 +665,10 @@
 
             sendMQTT('spital/logistik/bewegung', data);
 
-            // Formular ausblenden, Erfolgsmeldung mit OK-Button anzeigen
+            // Alles ausblenden, nur Erfolgsmeldung mit OK-Button anzeigen
             document.getElementById('bewegungStep1').classList.add('hidden');
             document.getElementById('bewegungStep2').classList.add('hidden');
+            document.querySelector('#bewegungScreen .btn-secondary').classList.add('hidden');
             document.getElementById('bewegungMessage').classList.remove('hidden');
         }
 
@@ -714,9 +717,11 @@
 
             sendMQTT('spital/logistik/entnahme', data);
 
-            // Formular ausblenden, Erfolgsmeldung mit OK-Button anzeigen
+            // Alles ausblenden, nur Erfolgsmeldung mit OK-Button anzeigen
             document.getElementById('entnahmeScanResult').classList.add('hidden');
             document.getElementById('entnahmeForm').classList.add('hidden');
+            document.querySelector('#entnahmeScreen .step-indicator').classList.add('hidden');
+            document.querySelector('#entnahmeScreen .btn-secondary').classList.add('hidden');
             document.getElementById('entnahmeMessage').classList.remove('hidden');
         }
 
