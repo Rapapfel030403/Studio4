@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spitallogistik</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            padding-top: 80px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        h2 {
+            color: #555;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* Select2 Anpassungen */
+        .select2-container--default .select2-selection--single {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            height: 46px;
+            padding: 6px;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 32px;
+            padding-left: 6px;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 44px;
+        }
+
+        .select2-container--default.select2-container--focus .select2-selection--single {
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-scan {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-scan:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(245, 87, 108, 0.4);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #qr-reader, #qr-reader-bewegung, #qr-reader-bewegung2, #qr-reader-entnahme {
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .scan-result {
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            color: #059669;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #dc2626;
+        }
+
+        .success {
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #059669;
+        }
+
+        .step-indicator {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .login-hint {
+            background: #f0f9ff;
+            border: 2px solid #3b82f6;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            color: #1e40af;
+            font-size: 13px;
+        }
+
+        .login-hint strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+                padding-top: 80px;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 10px 15px;
+            }
+
+            .user-badge {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            .logout-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Fixed Header (nur auf Hauptseite sichtbar) -->
+    <div id="appHeader" class="header hidden">
+        <div id="userInfo" class="user-badge"></div>
+        <button class="logout-btn" onclick="logout()">Abmelden</button>
+    </div>
+
+    <div class="container">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="card">
+            <h1>🏥 Spitallogistik</h1>
+            <p class="subtitle">Bitte melden Sie sich an</p>
+            
+            <div class="form-group">
+                <label for="username">Benutzer-ID</label>
+                <input type="text" id="username" placeholder="z.B. AL001">
+            </div>
+            
+            <button class="btn btn-primary" onclick="login()">Anmelden</button>
+            
+            <div id="loginError" class="error hidden"></div>
+
+            <div class="login-hint">
+                <strong>Test-Zugänge:</strong>
+                <div><strong>AL001</strong> - Hans Müller (Areallogistiker)</div>
+                <div><strong>AL002</strong> - Peter Huber (Areallogistiker)</div>
+                <div><strong>SL001</strong> - Anna Schmidt (Stationslogistiker)</div>
+                <div><strong>SL002</strong> - Sophie Meier (Stationslogistiker)</div>
+                <div><strong>PF001</strong> - Maria Weber (Pflegefachperson)</div>
+                <div><strong>PF002</strong> - Lisa Keller (Pflegefachperson)</div>
+            </div>
+        </div>
+
+        <!-- Main Menu Screen -->
+        <div id="mainScreen" class="card hidden">
+            <h1>Willkommen</h1>
+            
+            <div id="menuAreallogistiker" class="hidden">
+                <h2>Areallogistiker</h2>
+                <button class="btn btn-primary" onclick="startBefuellung()">
+                    📦 Neuer Behälterinhalt erfassen
+                </button>
+            </div>
+
+            <div id="menuStationslogistiker" class="hidden">
+                <h2>Stationslogistiker</h2>
+                <button class="btn btn-primary" onclick="startBewegung()">
+                    🚚 Neuen Behälterstandort erfassen
+                </button>
+            </div>
+
+            <div id="menuPflegefachperson" class="hidden">
+                <h2>Pflegefachperson</h2>
+                <button class="btn btn-primary" onclick="startEntnahme()">
+                    💊 Neuer Verbrauch erfassen
+                </button>
+            </div>
+        </div>
+
+        <!-- Befüllung Screen (Areallogistiker) -->
+        <div id="befuellungScreen" class="card hidden">
+            <h2>Behälter befüllen</h2>
+            <div class="step-indicator">Schritt 1: Behälter-QR scannen</div>
+            
+            <div id="qr-reader"></div>
+            <div id="scanResult1" class="scan-result hidden"></div>
+            
+            <div id="befuellungForm" class="hidden">
+                <div class="step-indicator">Schritt 2: Details eingeben</div>
+                
+                <div class="form-group">
+                    <label for="bestellnummer">Bestellnummer</label>
+                    <select id="bestellnummer" class="select2-search">
+                        <option value="">-- Bitte wählen --</option>
+                        <option value="BEST20250001">BEST20250001</option>
+                        <option value="BEST20250002">BEST20250002</option>
+                        <option value="BEST20250003">BEST20250003</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="versorgungsgut">Versorgungsgut</label>
+                    <select id="versorgungsgut" class="select2-search">
+                        <option value="">-- Bitte wählen --</option>
+                        <option value="VG001">Einmalhandschuhe Latex Gr. M</option>
+                        <option value="VG002">Desinfektionsmittel 500ml</option>
+                        <option value="VG003">Infusionsset Standard</option>
+                        <option value="VG004">Wundverband steril 10x10cm</option>
+                        <option value="VG005">Spritzen 10ml</option>
+                        <option value="VG006">Kanülen 21G</option>
+                        <option value="VG007">Kompressen steril 10x10cm</option>
+                        <option value="VG008">Pflaster wasserfest</option>
+                        <option value="VG009">Beatmungsmasken</option>
+                        <option value="VG010">Infusionslösung NaCl 0.9%</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="menge">Menge</label>
+                    <input type="number" id="menge" placeholder="z.B. 500" min="1">
+                </div>
+
+                <button class="btn btn-success" onclick="sendBefuellung()">✓ Befüllung speichern</button>
+            </div>
+
+            <button class="btn btn-secondary" onclick="backToMain()">← Zurück</button>
+            <div id="befuellungMessage" class="hidden"></div>
+        </div>
+
+        <!-- Bewegung Screen (Stationslogistiker) -->
+        <div id="bewegungScreen" class="card hidden">
+            <h2>Behälter einlagern</h2>
+            
+            <div id="bewegungStep1">
+                <div class="step-indicator">Schritt 1: Raum-QR scannen</div>
+                <div id="qr-reader-bewegung"></div>
+                <div id="raumResult" class="scan-result hidden"></div>
+            </div>
+
+            <div id="bewegungStep2" class="hidden">
+                <div class="step-indicator">Schritt 2: Behälter-QR scannen</div>
+                <div id="qr-reader-bewegung2"></div>
+                <div id="behaelterResult" class="scan-result hidden"></div>
+                <button class="btn btn-success hidden" id="bewegungSaveBtn" onclick="sendBewegung()">✓ Einlagerung speichern</button>
+            </div>
+
+            <button class="btn btn-secondary" onclick="backToMain()">← Zurück</button>
+            <div id="bewegungMessage" class="hidden"></div>
+        </div>
+
+        <!-- Entnahme Screen (Pflegefachperson) -->
+        <div id="entnahmeScreen" class="card hidden">
+            <h2>Material entnehmen</h2>
+            <div class="step-indicator">Schritt 1: Behälter-QR scannen</div>
+            
+            <div id="qr-reader-entnahme"></div>
+            <div id="entnahmeScanResult" class="scan-result hidden"></div>
+            
+            <div id="entnahmeForm" class="hidden">
+                <div class="step-indicator">Schritt 2: Menge eingeben</div>
+                
+                <div class="form-group">
+                    <label for="mengeEntnommen">Entnommene Menge</label>
+                    <input type="number" id="mengeEntnommen" value="1" min="1">
+                </div>
+
+                <button class="btn btn-success" onclick="sendEntnahme()">✓ Entnahme speichern</button>
+            </div>
+
+            <button class="btn btn-secondary" onclick="backToMain()">← Zurück</button>
+            <div id="entnahmeMessage" class="hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        // Globale Variablen
+        let currentUser = null;
+        let mqttClient = null;
+        let html5QrcodeScanner = null;
+        let scannedBehaelter = null;
+        let scannedRaum = null;
+
+        // Erweiterte Mock-Datenbank für Nutzer
+        const users = {
+            'AL001': { id: 'AL001', funktion: 'Areallogistiker', name: 'Hans Müller' },
+            'AL002': { id: 'AL002', funktion: 'Areallogistiker', name: 'Peter Huber' },
+            'SL001': { id: 'SL001', funktion: 'Stationslogistiker', name: 'Anna Schmidt' },
+            'SL002': { id: 'SL002', funktion: 'Stationslogistiker', name: 'Sophie Meier' },
+            'PF001': { id: 'PF001', funktion: 'Pflegefachperson', name: 'Maria Weber' },
+            'PF002': { id: 'PF002', funktion: 'Pflegefachperson', name: 'Lisa Keller' }
+        };
+
+        // Select2 initialisieren nach DOM-Laden
+        $(document).ready(function() {
+            initSelect2();
+        });
+
+        function initSelect2() {
+            $('.select2-search').select2({
+                width: '100%',
+                placeholder: '-- Bitte wählen --',
+                allowClear: true,
+                language: {
+                    noResults: function() {
+                        return "Keine Ergebnisse gefunden";
+                    },
+                    searching: function() {
+                        return "Suche...";
+                    }
+                }
+            });
+        }
+
+        // MQTT Setup
+        function initMQTT() {
+            mqttClient = new Paho.MQTT.Client('test.mosquitto.org', 8081, 'clientId_' + Date.now());
+            
+            mqttClient.onConnectionLost = (responseObject) => {
+                console.log('MQTT Verbindung verloren:', responseObject.errorMessage);
+            };
+
+            mqttClient.connect({
+                onSuccess: () => {
+                    console.log('MQTT verbunden');
+                },
+                onFailure: (error) => {
+                    console.log('MQTT Verbindung fehlgeschlagen:', error);
+                },
+                useSSL: true
+            });
+        }
+
+        // Login
+        function login() {
+            const username = document.getElementById('username').value.trim().toUpperCase();
+            const errorDiv = document.getElementById('loginError');
+            
+            if (!username) {
+                errorDiv.textContent = 'Bitte geben Sie eine Benutzer-ID ein';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            const user = users[username];
+            
+            if (!user) {
+                errorDiv.textContent = 'Benutzer nicht gefunden. Bitte verwenden Sie: AL001, AL002, SL001, SL002, PF001 oder PF002';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            currentUser = user;
+            showMainScreen();
+        }
+
+        // Hauptmenü anzeigen
+        function showMainScreen() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainScreen').classList.remove('hidden');
+            document.getElementById('appHeader').classList.remove('hidden');
+            
+            document.getElementById('userInfo').textContent = 
+                `${currentUser.name} - ${currentUser.funktion}`;
+
+            const menus = ['menuAreallogistiker', 'menuStationslogistiker', 'menuPflegefachperson'];
+            menus.forEach(menu => document.getElementById(menu).classList.add('hidden'));
+
+            if (currentUser.funktion === 'Areallogistiker') {
+                document.getElementById('menuAreallogistiker').classList.remove('hidden');
+            } else if (currentUser.funktion === 'Stationslogistiker') {
+                document.getElementById('menuStationslogistiker').classList.remove('hidden');
+            } else if (currentUser.funktion === 'Pflegefachperson') {
+                document.getElementById('menuPflegefachperson').classList.remove('hidden');
+            }
+
+            initMQTT();
+        }
+
+        // Logout
+        function logout() {
+            if (mqttClient && mqttClient.isConnected()) {
+                mqttClient.disconnect();
+            }
+            currentUser = null;
+            document.getElementById('mainScreen').classList.add('hidden');
+            document.getElementById('appHeader').classList.add('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('loginError').classList.add('hidden');
+        }
+
+        // Zurück zum Hauptmenü
+        function backToMain() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().catch(err => console.log(err));
+                html5QrcodeScanner = null;
+            }
+            
+            const screens = ['befuellungScreen', 'bewegungScreen', 'entnahmeScreen'];
+            screens.forEach(screen => document.getElementById(screen).classList.add('hidden'));
+            document.getElementById('mainScreen').classList.remove('hidden');
+            document.getElementById('appHeader').classList.remove('hidden');
+            
+            resetForms();
+        }
+
+        // Forms komplett zurücksetzen
+        function resetForms() {
+            scannedBehaelter = null;
+            scannedRaum = null;
+            
+            // Befüllung zurücksetzen
+            document.getElementById('scanResult1').classList.add('hidden');
+            document.getElementById('befuellungForm').classList.add('hidden');
+            document.getElementById('befuellungMessage').classList.add('hidden');
+            $('#bestellnummer').val('').trigger('change');
+            $('#versorgungsgut').val('').trigger('change');
+            document.getElementById('menge').value = '';
+            
+            // Bewegung zurücksetzen
+            document.getElementById('bewegungStep1').classList.remove('hidden');
+            document.getElementById('bewegungStep2').classList.add('hidden');
+            document.getElementById('raumResult').classList.add('hidden');
+            document.getElementById('behaelterResult').classList.add('hidden');
+            document.getElementById('bewegungSaveBtn').classList.add('hidden');
+            document.getElementById('bewegungMessage').classList.add('hidden');
+            
+            // Entnahme zurücksetzen
+            document.getElementById('entnahmeScanResult').classList.add('hidden');
+            document.getElementById('entnahmeForm').classList.add('hidden');
+            document.getElementById('entnahmeMessage').classList.add('hidden');
+            document.getElementById('mengeEntnommen').value = '1';
+        }
+
+        // QR-Code Scanner starten
+        function startQRScanner(elementId, onScanCallback) {
+            html5QrcodeScanner = new Html5Qrcode(elementId);
+            
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 250 },
+                (decodedText) => {
+                    html5QrcodeScanner.stop();
+                    onScanCallback(decodedText);
+                },
+                (error) => {
+                    // Fehler ignorieren
+                }
+            );
+        }
+
+        // ===== BEFÜLLUNG (Areallogistiker) =====
+        function startBefuellung() {
+            document.getElementById('mainScreen').classList.add('hidden');
+            document.getElementById('appHeader').classList.add('hidden');
+            document.getElementById('befuellungScreen').classList.remove('hidden');
+            resetForms();
+            
+            startQRScanner('qr-reader', (code) => {
+                if (code.startsWith('BEH')) {
+                    scannedBehaelter = code;
+                    document.getElementById('scanResult1').textContent = 
+                        `✓ Behälter gescannt: ${code}`;
+                    document.getElementById('scanResult1').classList.remove('hidden');
+                    document.getElementById('befuellungForm').classList.remove('hidden');
+                } else {
+                    alert('Bitte scannen Sie einen Behälter-QR-Code (beginnt mit BEH)');
+                    startQRScanner('qr-reader', arguments.callee);
+                }
+            });
+        }
+
+        function sendBefuellung() {
+            const bestellnummer = $('#bestellnummer').val();
+            const versorgungsgut = $('#versorgungsgut').val();
+            const menge = document.getElementById('menge').value;
+
+            if (!bestellnummer || !versorgungsgut || !menge) {
+                alert('Bitte füllen Sie alle Felder aus');
+                return;
+            }
+
+            const data = {
+                nutzer_id: currentUser.id,
+                behaelter_id: scannedBehaelter,
+                bestellnummer: bestellnummer,
+                versorgungs_id: versorgungsgut,
+                menge: parseInt(menge),
+                timestamp: new Date().toISOString()
+            };
+
+            sendMQTT('spital/logistik/befuellung', data);
+
+            const msgDiv = document.getElementById('befuellungMessage');
+            msgDiv.className = 'success';
+            msgDiv.textContent = '✓ Befüllung erfolgreich gespeichert!';
+            msgDiv.classList.remove('hidden');
+
+            setTimeout(() => {
+                resetForms();
+                startBefuellung();
+            }, 1500);
+        }
+
+        // ===== BEWEGUNG (Stationslogistiker) =====
+        function startBewegung() {
+            document.getElementById('mainScreen').classList.add('hidden');
+            document.getElementById('appHeader').classList.add('hidden');
+            document.getElementById('bewegungScreen').classList.remove('hidden');
+            resetForms();
+            
+            startQRScanner('qr-reader-bewegung', (code) => {
+                if (code.startsWith('R')) {
+                    scannedRaum = code;
+                    document.getElementById('raumResult').textContent = 
+                        `✓ Raum gescannt: ${code}`;
+                    document.getElementById('raumResult').classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        document.getElementById('bewegungStep2').classList.remove('hidden');
+                        startQRScanner('qr-reader-bewegung2', (code2) => {
+                            if (code2.startsWith('BEH')) {
+                                scannedBehaelter = code2;
+                                document.getElementById('behaelterResult').textContent = 
+                                    `✓ Behälter gescannt: ${code2}`;
+                                document.getElementById('behaelterResult').classList.remove('hidden');
+                                document.getElementById('bewegungSaveBtn').classList.remove('hidden');
+                            } else {
+                                alert('Bitte scannen Sie einen Behälter-QR-Code');
+                                startQRScanner('qr-reader-bewegung2', arguments.callee);
+                            }
+                        });
+                    }, 1000);
+                } else {
+                    alert('Bitte scannen Sie einen Raum-QR-Code (beginnt mit R)');
+                    startQRScanner('qr-reader-bewegung', arguments.callee);
+                }
+            });
+        }
+
+        function sendBewegung() {
+            const data = {
+                nutzer_id: currentUser.id,
+                behaelter_id: scannedBehaelter,
+                raum_id: scannedRaum,
+                timestamp: new Date().toISOString()
+            };
+
+            sendMQTT('spital/logistik/bewegung', data);
+
+            const msgDiv = document.getElementById('bewegungMessage');
+            msgDiv.className = 'success';
+            msgDiv.textContent = '✓ Behälter erfolgreich eingelagert!';
+            msgDiv.classList.remove('hidden');
+
+            setTimeout(() => {
+                resetForms();
+                startBewegung();
+            }, 1500);
+        }
+
+        // ===== ENTNAHME (Pflegefachperson) =====
+        function startEntnahme() {
+            document.getElementById('mainScreen').classList.add('hidden');
+            document.getElementById('appHeader').classList.add('hidden');
+            document.getElementById('entnahmeScreen').classList.remove('hidden');
+            resetForms();
+            
+            startQRScanner('qr-reader-entnahme', (code) => {
+                if (code.startsWith('BEH')) {
+                    scannedBehaelter = code;
+                    document.getElementById('entnahmeScanResult').textContent = 
+                        `✓ Behälter gescannt: ${code}`;
+                    document.getElementById('entnahmeScanResult').classList.remove('hidden');
+                    document.getElementById('entnahmeForm').classList.remove('hidden');
+                } else {
+                    alert('Bitte scannen Sie einen Behälter-QR-Code');
+                    startQRScanner('qr-reader-entnahme', arguments.callee);
+                }
+            });
+        }
+
+        function sendEntnahme() {
+            const menge = document.getElementById('mengeEntnommen').value;
+
+            if (!menge || menge < 1) {
+                alert('Bitte geben Sie eine gültige Menge ein');
+                return;
+            }
+
+            const data = {
+                nutzer_id: currentUser.id,
+                behaelter_id: scannedBehaelter,
+                menge: parseInt(menge),
+                timestamp: new Date().toISOString()
+            };
+
+            sendMQTT('spital/logistik/entnahme', data);
+
+            const msgDiv = document.getElementById('entnahmeMessage');
+            msgDiv.className = 'success';
+            msgDiv.textContent = '✓ Entnahme erfolgreich gespeichert!';
+            msgDiv.classList.remove('hidden');
+
+            setTimeout(() => {
+                resetForms();
+                startEntnahme();
+            }, 1500);
+        }
+
+        // MQTT Nachricht senden
+        function sendMQTT(topic, data) {
+            console.log('Sende MQTT:', topic, data);
+            
+            if (mqttClient && mqttClient.isConnected()) {
+                const message = new Paho.MQTT.Message(JSON.stringify(data));
+                message.destinationName = topic;
+                mqttClient.send(message);
+                console.log('✓ MQTT gesendet');
+            } else {
+                console.log('MQTT nicht verbunden - Daten würden gesendet werden:', data);
+            }
+        }
+    </script>
+</body>
+</html>
