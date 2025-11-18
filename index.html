@@ -35,7 +35,6 @@
             padding: 30px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             margin-bottom: 20px;
-            position: relative;
         }
 
         .header {
@@ -72,10 +71,6 @@
             cursor: pointer;
             font-weight: 600;
             font-size: 14px;
-        }
-
-        .logout-btn:hover {
-            background: #dc2626;
         }
 
         h1 {
@@ -122,7 +117,6 @@
             border-color: #667eea;
         }
 
-        /* Select2 Anpassungen */
         .select2-container--default .select2-selection--single {
             border: 2px solid #e0e0e0;
             border-radius: 10px;
@@ -181,16 +175,6 @@
 
         .btn-success:hover {
             background: #059669;
-        }
-
-        .btn-scan {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-        }
-
-        .btn-scan:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(245, 87, 108, 0.4);
         }
 
         .hidden {
@@ -281,7 +265,7 @@
     </style>
 </head>
 <body>
-    <!-- Fixed Header (nur auf Hauptseite sichtbar) -->
+    <!-- Fixed Header -->
     <div id="appHeader" class="header hidden">
         <div id="userInfo" class="user-badge"></div>
         <button class="logout-btn" onclick="logout()">Abmelden</button>
@@ -319,27 +303,27 @@
             
             <div id="menuAreallogistiker" class="hidden">
                 <h2>Areallogistiker</h2>
-                <button class="btn btn-primary" onclick="startBefuellung()">
+                <button class="btn btn-primary" onclick="showBefuellung()">
                     📦 Neuer Behälterinhalt erfassen
                 </button>
             </div>
 
             <div id="menuStationslogistiker" class="hidden">
                 <h2>Stationslogistiker</h2>
-                <button class="btn btn-primary" onclick="startBewegung()">
+                <button class="btn btn-primary" onclick="showBewegung()">
                     🚚 Neuen Behälterstandort erfassen
                 </button>
             </div>
 
             <div id="menuPflegefachperson" class="hidden">
                 <h2>Pflegefachperson</h2>
-                <button class="btn btn-primary" onclick="startEntnahme()">
+                <button class="btn btn-primary" onclick="showEntnahme()">
                     💊 Neuer Verbrauch erfassen
                 </button>
             </div>
         </div>
 
-        <!-- Befüllung Screen (Areallogistiker) -->
+        <!-- Befüllung Screen -->
         <div id="befuellungScreen" class="card hidden">
             <h2>Behälter befüllen</h2>
             <div class="step-indicator">Schritt 1: Behälter-QR scannen</div>
@@ -382,14 +366,14 @@
                     <input type="number" id="menge" placeholder="z.B. 500" min="1">
                 </div>
 
-                <button class="btn btn-success" onclick="sendBefuellung()">✓ Befüllung speichern</button>
+                <button class="btn btn-success" onclick="saveBefuellung()">✓ Befüllung speichern</button>
             </div>
 
-            <button class="btn btn-secondary" onclick="backToMain()">← Zurück</button>
+            <button class="btn btn-secondary" onclick="goToMain()">← Zurück</button>
             <div id="befuellungMessage" class="hidden"></div>
         </div>
 
-        <!-- Bewegung Screen (Stationslogistiker) -->
+        <!-- Bewegung Screen -->
         <div id="bewegungScreen" class="card hidden">
             <h2>Behälter einlagern</h2>
             
@@ -403,14 +387,14 @@
                 <div class="step-indicator">Schritt 2: Behälter-QR scannen</div>
                 <div id="qr-reader-bewegung2"></div>
                 <div id="behaelterResult" class="scan-result hidden"></div>
-                <button class="btn btn-success hidden" id="bewegungSaveBtn" onclick="sendBewegung()">✓ Einlagerung speichern</button>
+                <button class="btn btn-success hidden" id="bewegungSaveBtn" onclick="saveBewegung()">✓ Einlagerung speichern</button>
             </div>
 
-            <button class="btn btn-secondary" onclick="backToMain()">← Zurück</button>
+            <button class="btn btn-secondary" onclick="goToMain()">← Zurück</button>
             <div id="bewegungMessage" class="hidden"></div>
         </div>
 
-        <!-- Entnahme Screen (Pflegefachperson) -->
+        <!-- Entnahme Screen -->
         <div id="entnahmeScreen" class="card hidden">
             <h2>Material entnehmen</h2>
             <div class="step-indicator">Schritt 1: Behälter-QR scannen</div>
@@ -426,24 +410,24 @@
                     <input type="number" id="mengeEntnommen" value="1" min="1">
                 </div>
 
-                <button class="btn btn-success" onclick="sendEntnahme()">✓ Entnahme speichern</button>
+                <button class="btn btn-success" onclick="saveEntnahme()">✓ Entnahme speichern</button>
             </div>
 
-            <button class="btn btn-secondary" onclick="backToMain()">← Zurück</button>
+            <button class="btn btn-secondary" onclick="goToMain()">← Zurück</button>
             <div id="entnahmeMessage" class="hidden"></div>
         </div>
     </div>
 
     <script>
         // Globale Variablen
-        let currentUser = null;
-        let mqttClient = null;
-        let html5QrcodeScanner = null;
-        let scannedBehaelter = null;
-        let scannedRaum = null;
+        var currentUser = null;
+        var mqttClient = null;
+        var qrScanner = null;
+        var scannedBehaelter = null;
+        var scannedRaum = null;
 
-        // Erweiterte Mock-Datenbank für Nutzer
-        const users = {
+        // Nutzer-Datenbank
+        var users = {
             'AL001': { id: 'AL001', funktion: 'Areallogistiker', name: 'Hans Müller' },
             'AL002': { id: 'AL002', funktion: 'Areallogistiker', name: 'Peter Huber' },
             'SL001': { id: 'SL001', funktion: 'Stationslogistiker', name: 'Anna Schmidt' },
@@ -452,80 +436,53 @@
             'PF002': { id: 'PF002', funktion: 'Pflegefachperson', name: 'Lisa Keller' }
         };
 
-        // Select2 initialisieren nach DOM-Laden
+        // Select2 initialisieren
         $(document).ready(function() {
-            initSelect2();
-        });
-
-        function initSelect2() {
             $('.select2-search').select2({
                 width: '100%',
                 placeholder: '-- Bitte wählen --',
-                allowClear: true,
-                language: {
-                    noResults: function() {
-                        return "Keine Ergebnisse gefunden";
-                    },
-                    searching: function() {
-                        return "Suche...";
-                    }
-                }
+                allowClear: true
             });
-        }
+        });
 
         // MQTT Setup
         function initMQTT() {
-            mqttClient = new Paho.MQTT.Client('test.mosquitto.org', 8081, 'clientId_' + Date.now());
-            
-            mqttClient.onConnectionLost = (responseObject) => {
-                console.log('MQTT Verbindung verloren:', responseObject.errorMessage);
-            };
-
+            mqttClient = new Paho.MQTT.Client('test.mosquitto.org', 8081, 'client_' + Date.now());
             mqttClient.connect({
-                onSuccess: () => {
-                    console.log('MQTT verbunden');
-                },
-                onFailure: (error) => {
-                    console.log('MQTT Verbindung fehlgeschlagen:', error);
-                },
+                onSuccess: function() { console.log('MQTT verbunden'); },
+                onFailure: function(e) { console.log('MQTT Fehler:', e); },
                 useSSL: true
             });
         }
 
         // Login
         function login() {
-            const username = document.getElementById('username').value.trim().toUpperCase();
-            const errorDiv = document.getElementById('loginError');
+            var username = document.getElementById('username').value.trim().toUpperCase();
+            var errorDiv = document.getElementById('loginError');
             
             if (!username) {
-                errorDiv.textContent = 'Bitte geben Sie eine Benutzer-ID ein';
+                errorDiv.textContent = 'Bitte Benutzer-ID eingeben';
                 errorDiv.classList.remove('hidden');
                 return;
             }
 
-            const user = users[username];
-            
+            var user = users[username];
             if (!user) {
-                errorDiv.textContent = 'Benutzer nicht gefunden. Bitte verwenden Sie: AL001, AL002, SL001, SL002, PF001 oder PF002';
+                errorDiv.textContent = 'Benutzer nicht gefunden';
                 errorDiv.classList.remove('hidden');
                 return;
             }
 
             currentUser = user;
-            showMainScreen();
-        }
-
-        // Hauptmenü anzeigen
-        function showMainScreen() {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainScreen').classList.remove('hidden');
             document.getElementById('appHeader').classList.remove('hidden');
-            
-            document.getElementById('userInfo').textContent = 
-                `${currentUser.name} - ${currentUser.funktion}`;
+            document.getElementById('userInfo').textContent = currentUser.name + ' - ' + currentUser.funktion;
 
-            const menus = ['menuAreallogistiker', 'menuStationslogistiker', 'menuPflegefachperson'];
-            menus.forEach(menu => document.getElementById(menu).classList.add('hidden'));
+            // Menü anzeigen
+            document.getElementById('menuAreallogistiker').classList.add('hidden');
+            document.getElementById('menuStationslogistiker').classList.add('hidden');
+            document.getElementById('menuPflegefachperson').classList.add('hidden');
 
             if (currentUser.funktion === 'Areallogistiker') {
                 document.getElementById('menuAreallogistiker').classList.remove('hidden');
@@ -552,26 +509,41 @@
         }
 
         // Zurück zum Hauptmenü
-        function backToMain() {
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().catch(err => console.log(err));
-                html5QrcodeScanner = null;
+        function goToMain() {
+            // Scanner stoppen
+            if (qrScanner) {
+                qrScanner.stop().catch(function(err) { console.log(err); });
+                qrScanner = null;
             }
             
-            const screens = ['befuellungScreen', 'bewegungScreen', 'entnahmeScreen'];
-            screens.forEach(screen => document.getElementById(screen).classList.add('hidden'));
+            // Alle Screens verstecken
+            document.getElementById('befuellungScreen').classList.add('hidden');
+            document.getElementById('bewegungScreen').classList.add('hidden');
+            document.getElementById('entnahmeScreen').classList.add('hidden');
+            
+            // Hauptmenü anzeigen
             document.getElementById('mainScreen').classList.remove('hidden');
             document.getElementById('appHeader').classList.remove('hidden');
-            
-            resetForms();
         }
 
-        // Forms komplett zurücksetzen
-        function resetForms() {
+        // Scanner starten
+        function startScanner(elementId, callback) {
+            qrScanner = new Html5Qrcode(elementId);
+            qrScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 250 },
+                function(code) {
+                    qrScanner.stop();
+                    callback(code);
+                },
+                function(err) { }
+            );
+        }
+
+        // ========== BEFÜLLUNG ==========
+        function showBefuellung() {
+            // Reset
             scannedBehaelter = null;
-            scannedRaum = null;
-            
-            // Befüllung zurücksetzen
             document.getElementById('scanResult1').classList.add('hidden');
             document.getElementById('befuellungForm').classList.add('hidden');
             document.getElementById('befuellungMessage').classList.add('hidden');
@@ -579,70 +551,36 @@
             $('#versorgungsgut').val('').trigger('change');
             document.getElementById('menge').value = '';
             
-            // Bewegung zurücksetzen
-            document.getElementById('bewegungStep1').classList.remove('hidden');
-            document.getElementById('bewegungStep2').classList.add('hidden');
-            document.getElementById('raumResult').classList.add('hidden');
-            document.getElementById('behaelterResult').classList.add('hidden');
-            document.getElementById('bewegungSaveBtn').classList.add('hidden');
-            document.getElementById('bewegungMessage').classList.add('hidden');
-            
-            // Entnahme zurücksetzen
-            document.getElementById('entnahmeScanResult').classList.add('hidden');
-            document.getElementById('entnahmeForm').classList.add('hidden');
-            document.getElementById('entnahmeMessage').classList.add('hidden');
-            document.getElementById('mengeEntnommen').value = '1';
-        }
-
-        // QR-Code Scanner starten
-        function startQRScanner(elementId, onScanCallback) {
-            html5QrcodeScanner = new Html5Qrcode(elementId);
-            
-            html5QrcodeScanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: 250 },
-                (decodedText) => {
-                    html5QrcodeScanner.stop();
-                    onScanCallback(decodedText);
-                },
-                (error) => {
-                    // Fehler ignorieren
-                }
-            );
-        }
-
-        // ===== BEFÜLLUNG (Areallogistiker) =====
-        function startBefuellung() {
-            resetForms();
+            // Screen wechseln
             document.getElementById('mainScreen').classList.add('hidden');
             document.getElementById('appHeader').classList.add('hidden');
             document.getElementById('befuellungScreen').classList.remove('hidden');
             
-            startQRScanner('qr-reader', (code) => {
+            // Scanner starten
+            startScanner('qr-reader', function(code) {
                 if (code.startsWith('BEH')) {
                     scannedBehaelter = code;
-                    document.getElementById('scanResult1').textContent = 
-                        `✓ Behälter gescannt: ${code}`;
+                    document.getElementById('scanResult1').textContent = '✓ Behälter: ' + code;
                     document.getElementById('scanResult1').classList.remove('hidden');
                     document.getElementById('befuellungForm').classList.remove('hidden');
                 } else {
-                    alert('Bitte scannen Sie einen Behälter-QR-Code (beginnt mit BEH)');
-                    startQRScanner('qr-reader', arguments.callee);
+                    alert('Bitte Behälter-QR scannen (beginnt mit BEH)');
+                    startScanner('qr-reader', arguments.callee);
                 }
             });
         }
 
-        function sendBefuellung() {
-            const bestellnummer = $('#bestellnummer').val();
-            const versorgungsgut = $('#versorgungsgut').val();
-            const menge = document.getElementById('menge').value;
+        function saveBefuellung() {
+            var bestellnummer = $('#bestellnummer').val();
+            var versorgungsgut = $('#versorgungsgut').val();
+            var menge = document.getElementById('menge').value;
 
             if (!bestellnummer || !versorgungsgut || !menge) {
-                alert('Bitte füllen Sie alle Felder aus');
+                alert('Bitte alle Felder ausfüllen');
                 return;
             }
 
-            const data = {
+            var data = {
                 nutzer_id: currentUser.id,
                 behaelter_id: scannedBehaelter,
                 bestellnummer: bestellnummer,
@@ -653,55 +591,64 @@
 
             sendMQTT('spital/logistik/befuellung', data);
 
-            const msgDiv = document.getElementById('befuellungMessage');
-            msgDiv.className = 'success';
-            msgDiv.textContent = '✓ Befüllung erfolgreich gespeichert!';
-            msgDiv.classList.remove('hidden');
+            document.getElementById('befuellungMessage').className = 'success';
+            document.getElementById('befuellungMessage').textContent = '✓ Erfolgreich gespeichert!';
+            document.getElementById('befuellungMessage').classList.remove('hidden');
 
-            setTimeout(() => {
-                resetForms();
-                backToMain();
+            setTimeout(function() {
+                goToMain();
             }, 1500);
         }
 
-        // ===== BEWEGUNG (Stationslogistiker) =====
-        function startBewegung() {
-            resetForms();
+        // ========== BEWEGUNG ==========
+        function showBewegung() {
+            // Reset
+            scannedBehaelter = null;
+            scannedRaum = null;
+            document.getElementById('bewegungStep1').classList.remove('hidden');
+            document.getElementById('bewegungStep2').classList.add('hidden');
+            document.getElementById('raumResult').classList.add('hidden');
+            document.getElementById('behaelterResult').classList.add('hidden');
+            document.getElementById('bewegungSaveBtn').classList.add('hidden');
+            document.getElementById('bewegungMessage').classList.add('hidden');
+            
+            // Screen wechseln
             document.getElementById('mainScreen').classList.add('hidden');
             document.getElementById('appHeader').classList.add('hidden');
             document.getElementById('bewegungScreen').classList.remove('hidden');
             
-            startQRScanner('qr-reader-bewegung', (code) => {
+            // Scanner für Raum starten
+            startScanner('qr-reader-bewegung', function(code) {
                 if (code.startsWith('R')) {
                     scannedRaum = code;
-                    document.getElementById('raumResult').textContent = 
-                        `✓ Raum gescannt: ${code}`;
+                    document.getElementById('raumResult').textContent = '✓ Raum: ' + code;
                     document.getElementById('raumResult').classList.remove('hidden');
                     
-                    setTimeout(() => {
+                    setTimeout(function() {
                         document.getElementById('bewegungStep2').classList.remove('hidden');
-                        startQRScanner('qr-reader-bewegung2', (code2) => {
+                        
+                        // Scanner für Behälter starten
+                        startScanner('qr-reader-bewegung2', function(code2) {
                             if (code2.startsWith('BEH')) {
                                 scannedBehaelter = code2;
-                                document.getElementById('behaelterResult').textContent = 
-                                    `✓ Behälter gescannt: ${code2}`;
+                                document.getElementById('behaelterResult').textContent = '✓ Behälter: ' + code2;
                                 document.getElementById('behaelterResult').classList.remove('hidden');
                                 document.getElementById('bewegungSaveBtn').classList.remove('hidden');
                             } else {
-                                alert('Bitte scannen Sie einen Behälter-QR-Code');
-                                startQRScanner('qr-reader-bewegung2', arguments.callee);
+                                alert('Bitte Behälter-QR scannen');
+                                startScanner('qr-reader-bewegung2', arguments.callee);
                             }
                         });
                     }, 1000);
                 } else {
-                    alert('Bitte scannen Sie einen Raum-QR-Code (beginnt mit R)');
-                    startQRScanner('qr-reader-bewegung', arguments.callee);
+                    alert('Bitte Raum-QR scannen (beginnt mit R)');
+                    startScanner('qr-reader-bewegung', arguments.callee);
                 }
             });
         }
 
-        function sendBewegung() {
-            const data = {
+        function saveBewegung() {
+            var data = {
                 nutzer_id: currentUser.id,
                 behaelter_id: scannedBehaelter,
                 raum_id: scannedRaum,
@@ -710,61 +657,52 @@
 
             sendMQTT('spital/logistik/bewegung', data);
 
-            const msgDiv = document.getElementById('bewegungMessage');
-            msgDiv.className = 'success';
-            msgDiv.textContent = '✓ Behälter erfolgreich eingelagert!';
-            msgDiv.classList.remove('hidden');
+            document.getElementById('bewegungMessage').className = 'success';
+            document.getElementById('bewegungMessage').textContent = '✓ Erfolgreich eingelagert!';
+            document.getElementById('bewegungMessage').classList.remove('hidden');
 
-            setTimeout(() => {
-                // Bewegung Screen verstecken
-                document.getElementById('bewegungScreen').classList.add('hidden');
-                
-                // Hauptmenü anzeigen
-                document.getElementById('mainScreen').classList.remove('hidden');
-                document.getElementById('appHeader').classList.remove('hidden');
-                
-                // Formulare für nächstes Mal zurücksetzen
-                scannedBehaelter = null;
-                scannedRaum = null;
-                document.getElementById('bewegungStep1').classList.remove('hidden');
-                document.getElementById('bewegungStep2').classList.add('hidden');
-                document.getElementById('raumResult').classList.add('hidden');
-                document.getElementById('behaelterResult').classList.add('hidden');
-                document.getElementById('bewegungSaveBtn').classList.add('hidden');
-                document.getElementById('bewegungMessage').classList.add('hidden');
+            setTimeout(function() {
+                goToMain();
             }, 1500);
         }
 
-        // ===== ENTNAHME (Pflegefachperson) =====
-        function startEntnahme() {
-            resetForms();
+        // ========== ENTNAHME ==========
+        function showEntnahme() {
+            // Reset
+            scannedBehaelter = null;
+            document.getElementById('entnahmeScanResult').classList.add('hidden');
+            document.getElementById('entnahmeForm').classList.add('hidden');
+            document.getElementById('entnahmeMessage').classList.add('hidden');
+            document.getElementById('mengeEntnommen').value = '1';
+            
+            // Screen wechseln
             document.getElementById('mainScreen').classList.add('hidden');
             document.getElementById('appHeader').classList.add('hidden');
             document.getElementById('entnahmeScreen').classList.remove('hidden');
             
-            startQRScanner('qr-reader-entnahme', (code) => {
+            // Scanner starten
+            startScanner('qr-reader-entnahme', function(code) {
                 if (code.startsWith('BEH')) {
                     scannedBehaelter = code;
-                    document.getElementById('entnahmeScanResult').textContent = 
-                        `✓ Behälter gescannt: ${code}`;
+                    document.getElementById('entnahmeScanResult').textContent = '✓ Behälter: ' + code;
                     document.getElementById('entnahmeScanResult').classList.remove('hidden');
                     document.getElementById('entnahmeForm').classList.remove('hidden');
                 } else {
-                    alert('Bitte scannen Sie einen Behälter-QR-Code');
-                    startQRScanner('qr-reader-entnahme', arguments.callee);
+                    alert('Bitte Behälter-QR scannen');
+                    startScanner('qr-reader-entnahme', arguments.callee);
                 }
             });
         }
 
-        function sendEntnahme() {
-            const menge = document.getElementById('mengeEntnommen').value;
+        function saveEntnahme() {
+            var menge = document.getElementById('mengeEntnommen').value;
 
             if (!menge || menge < 1) {
-                alert('Bitte geben Sie eine gültige Menge ein');
+                alert('Bitte gültige Menge eingeben');
                 return;
             }
 
-            const data = {
+            var data = {
                 nutzer_id: currentUser.id,
                 behaelter_id: scannedBehaelter,
                 menge: parseInt(menge),
@@ -773,39 +711,22 @@
 
             sendMQTT('spital/logistik/entnahme', data);
 
-            const msgDiv = document.getElementById('entnahmeMessage');
-            msgDiv.className = 'success';
-            msgDiv.textContent = '✓ Entnahme erfolgreich gespeichert!';
-            msgDiv.classList.remove('hidden');
+            document.getElementById('entnahmeMessage').className = 'success';
+            document.getElementById('entnahmeMessage').textContent = '✓ Erfolgreich gespeichert!';
+            document.getElementById('entnahmeMessage').classList.remove('hidden');
 
-            setTimeout(() => {
-                // Entnahme Screen verstecken
-                document.getElementById('entnahmeScreen').classList.add('hidden');
-                
-                // Hauptmenü anzeigen
-                document.getElementById('mainScreen').classList.remove('hidden');
-                document.getElementById('appHeader').classList.remove('hidden');
-                
-                // Formulare für nächstes Mal zurücksetzen
-                scannedBehaelter = null;
-                document.getElementById('entnahmeScanResult').classList.add('hidden');
-                document.getElementById('entnahmeForm').classList.add('hidden');
-                document.getElementById('entnahmeMessage').classList.add('hidden');
-                document.getElementById('mengeEntnommen').value = '1';
+            setTimeout(function() {
+                goToMain();
             }, 1500);
         }
 
-        // MQTT Nachricht senden
+        // MQTT senden
         function sendMQTT(topic, data) {
-            console.log('Sende MQTT:', topic, data);
-            
+            console.log('MQTT:', topic, data);
             if (mqttClient && mqttClient.isConnected()) {
-                const message = new Paho.MQTT.Message(JSON.stringify(data));
-                message.destinationName = topic;
-                mqttClient.send(message);
-                console.log('✓ MQTT gesendet');
-            } else {
-                console.log('MQTT nicht verbunden - Daten würden gesendet werden:', data);
+                var msg = new Paho.MQTT.Message(JSON.stringify(data));
+                msg.destinationName = topic;
+                mqttClient.send(msg);
             }
         }
     </script>
